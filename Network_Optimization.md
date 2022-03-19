@@ -7,20 +7,25 @@ Maciej Lecicki
 
 ### Purpose and objectives
 
-WORK IN PROGRESS
+Linear optimization is yet another example how Supply Chain can benefit
+open source software like R. In this example we’ll look into supply
+chain network design. The goal is to give decision makers options to
+select location and number of warehouses (DCs) to distribute their
+product (vaccine) on the basis of total cost made of transportation and
+warehouses cost (fixed and variable) or factors like total distance
+(based on customer location and batch size) or maximum distance from
+customer (which can impact delivery time). Linear optimization is done
+using ompr package but since we’ll be working with spatial data, we’ll
+also use maps and leaflet libraries. As always, tidyverse library will
+be helpful to transform and visualize data.
 
-<br/>
-
-##### Libraries and data examination
-
-<br/>
-
-List of libraries.
+List of libraries is available below.
 
 ``` r
 library(tidyverse)
 library(magrittr)
 library(leaflet)
+library(maps)
 library(ompr)
 library(ompr.roi)
 library(ROI.plugin.glpk)
@@ -28,16 +33,26 @@ library(scales)
 library(gridExtra)
 ```
 
-``` r
-pol_city <- maps::world.cities %>% 
-  dplyr::filter(country.etc == 'Poland') %>%
-  dplyr::mutate(demand = ceiling(pop*2),
-                no_of_shipments = ceiling(demand/1000))
-```
+Let’s first collect spatial details for all cities in Poland using maps
+package, namely world.cities dataset which includes spatial information
+about each city. Demand for vaccine can be calculated on the basis of
+cities’ population. We assume that all people wants to get vaccinated.
+One transport batch of the product is 1k units.
 
 ``` r
-pol_dc <- pol_city %>% 
-  dplyr::filter(name %in% c('Tarnobrzeg','Siedlce','Plock','Zgierz',
+pol_city <- maps::world.cities %>% 
+  filter(country.etc == 'Poland') %>%
+  mutate(demand = ceiling(pop*2),
+         no_of_shipments = ceiling(demand/1000))
+```
+
+From the list of cities we can also select potential 12 DCs. Each DCs
+has assigned colour. It’s a simple trick that will help us in the future
+with visualization.
+
+``` r
+pol_dc <- pol_city %>%
+  filter(name %in% c('Tarnobrzeg','Siedlce','Plock','Zgierz',
                             'Jaworzno', 'Tarnow', "Legnica", "Leszno", "Kalisz",
                             "Pila", "Olsztyn", "Gorzow Wielkopolski"))
 
@@ -49,7 +64,10 @@ colors <- c("orange", "pink", "darkblue", "blue", "grey", "red", "yellow",
 pol_dc <- cbind(pol_dc, colors)
 ```
 
-visualization of cities and warehouses
+Visualization of cities and warehouses can be done with leaflet package
+using below code. This will output interactive html map which
+unfortunately cannot be displayed on github so instead I’ll show static
+PNG file. I encourage however to run it locally.
 
 ``` r
 leaflet(pol_city) %>%
@@ -59,11 +77,13 @@ leaflet(pol_city) %>%
                    radius = 2)
 ```
 
+Here’s map of Poland with all cities…
+
 ``` r
-knitr::include_graphics("images/pol_city.PNG")
+knitr::include_graphics("images/pol_city.png")
 ```
 
-![](images/pol_city.PNG)<!-- -->
+![](images/pol_city.png)<!-- -->
 
 ``` r
 leaflet(pol_dc) %>%
@@ -73,11 +93,17 @@ leaflet(pol_dc) %>%
                    radius = 2)
 ```
 
+… and a map with location of potential DCs.
+
 ``` r
 knitr::include_graphics("images/pol_dc.png")
 ```
 
 ![](images/pol_dc.png)<!-- -->
+
+### Linear optimization
+
+To be continued…
 
 ``` r
 # fixed and handling costs of the DC
@@ -230,7 +256,7 @@ p1 <- overview_summary %>%
   theme(legend.position = "bottom", legend.title = element_blank()) +
   labs(title = "Cost summary based on warehousing and transportation costs.",
        x = "Number of warehouses",
-       y = "Cost")
+       y = "Cost (PLN)")
 
 p1
 ```
