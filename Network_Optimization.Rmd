@@ -1,0 +1,75 @@
+---
+title: "Network_Optimization"
+author: "Maciej Lecicki"
+date: "19.03.2022"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(echo = TRUE, include = TRUE, warning = FALSE, message = FALSE, fig.pos = "H", fig.width = 12, fig.height = 6)
+```
+
+<br/>
+<br/>
+<br/>
+
+### Purpose and objectives
+<br/>
+
+
+##### Libraries and data examination
+<br/>
+
+List of libraries.
+
+```{r}
+library(tidyverse)
+library(magrittr)
+library(leaflet)
+library(ompr)
+library(ompr.roi)
+library(ROI.plugin.glpk)
+library(scales)
+library(gridExtra)
+```
+
+
+```{r}
+pol_city <- maps::world.cities %>% 
+  dplyr::filter(country.etc == 'Poland') %>%
+  dplyr::mutate(demand = ceiling(pop*2),
+                no_of_shipments = ceiling(demand/1000))
+```
+
+```{r}
+pol_dc <- pol_city %>% 
+  dplyr::filter(name %in% c('Tarnobrzeg','Siedlce','Plock','Zgierz',
+                            'Jaworzno', 'Tarnow', "Legnica", "Leszno", "Kalisz",
+                            "Pila", "Olsztyn", "Gorzow Wielkopolski"))
+
+# color-coding for DC visualization
+colors <- c("orange", "pink", "darkblue", "blue", "grey", "red", "yellow", 
+            "green", "blueviolet", "gold", "brown", "darkred")
+
+# binding all columns together
+pol_dc <- cbind(pol_dc, colors)
+```
+
+```{r}
+# visualization of cities and warehouses
+leaflet(pol_city) %>% 
+  addTiles() %>% 
+  addCircleMarkers(lat = ~lat,
+                   lng = ~long,
+                   radius = 2)
+```
+
+```{r}
+
+leaflet(pol_dc) %>% 
+  addTiles() %>% 
+  addCircleMarkers(lat = ~lat,
+                   lng = ~long,
+                   radius = 2)
+```
+
