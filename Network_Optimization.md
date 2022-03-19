@@ -60,10 +60,10 @@ leaflet(pol_city) %>%
 ```
 
 ``` r
-knitr::include_graphics("pol_city.jpg")
+knitr::include_graphics("images/pol_city.PNG")
 ```
 
-![](pol_city.jpg)<!-- -->
+![](images/pol_city.PNG)<!-- -->
 
 ``` r
 leaflet(pol_dc) %>%
@@ -74,10 +74,10 @@ leaflet(pol_dc) %>%
 ```
 
 ``` r
-knitr::include_graphics("images/pol_dc.jpg")
+knitr::include_graphics("images/pol_dc.png")
 ```
 
-![](images/pol_dc.jpg)<!-- -->
+![](images/pol_dc.png)<!-- -->
 
 ``` r
 # fixed and handling costs of the DC
@@ -296,10 +296,10 @@ leaflet(optimization_results[[7]]) %>%
 ```
 
 ``` r
-knitr::include_graphics("images/seven_wh.jpg")
+knitr::include_graphics("images/seven_wh.png")
 ```
 
-![](images/seven_wh.jpg)<!-- -->
+![](images/seven_wh.png)<!-- -->
 
 ``` r
 #optimization summary
