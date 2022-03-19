@@ -60,11 +60,10 @@ leaflet(pol_city) %>%
 ```
 
 ``` r
-image1 <- knitr::include_graphics("images/pol_city.jpg")
-image1
+knitr::include_graphics("pol_city.jpg")
 ```
 
-![](images/pol_city.jpg)<!-- -->
+![](pol_city.jpg)<!-- -->
 
 ``` r
 leaflet(pol_dc) %>%
