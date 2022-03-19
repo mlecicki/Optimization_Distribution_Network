@@ -1,4 +1,4 @@
-Network_Optimization
+Network Optimization with R
 ================
 Maciej Lecicki
 19.03.2022
@@ -6,6 +6,8 @@ Maciej Lecicki
 <br/> <br/> <br/>
 
 ### Purpose and objectives
+
+WORK IN PROGRESS
 
 <br/>
 
