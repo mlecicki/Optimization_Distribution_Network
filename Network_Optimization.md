@@ -1,31 +1,21 @@
----
-title: "Network Optimization with R"
-author: "Maciej Lecicki"
-date: "19.03.2022"
-output: github_document
----
+Network_Optimization
+================
+Maciej Lecicki
+19.03.2022
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(echo = TRUE, include = TRUE, warning = FALSE, message = FALSE, fig.pos = "H", fig.width = 12, fig.height = 6)
-```
-
-<br/>
-<br/>
-<br/>
+<br/> <br/> <br/>
 
 ### Purpose and objectives
 
-WORK IN PROGRESS
-
 <br/>
 
-
 ##### Libraries and data examination
+
 <br/>
 
 List of libraries.
 
-```{r}
+``` r
 library(tidyverse)
 library(magrittr)
 library(leaflet)
@@ -36,15 +26,14 @@ library(scales)
 library(gridExtra)
 ```
 
-
-```{r}
+``` r
 pol_city <- maps::world.cities %>% 
   dplyr::filter(country.etc == 'Poland') %>%
   dplyr::mutate(demand = ceiling(pop*2),
                 no_of_shipments = ceiling(demand/1000))
 ```
 
-```{r}
+``` r
 pol_dc <- pol_city %>% 
   dplyr::filter(name %in% c('Tarnobrzeg','Siedlce','Plock','Zgierz',
                             'Jaworzno', 'Tarnow', "Legnica", "Leszno", "Kalisz",
@@ -60,37 +49,35 @@ pol_dc <- cbind(pol_dc, colors)
 
 visualization of cities and warehouses
 
-```{r eval = FALSE}
+``` r
 leaflet(pol_city) %>%
   addTiles() %>%
   addCircleMarkers(lat = ~lat,
                    lng = ~long,
                    radius = 2)
-
 ```
 
-```{r}
+``` r
 knitr::include_graphics("images/pol_city.jpg")
-
 ```
 
+![](images/pol_city.jpg)<!-- -->
 
-```{r eval = FALSE}
-
+``` r
 leaflet(pol_dc) %>%
   addTiles() %>%
   addCircleMarkers(lat = ~lat,
                    lng = ~long,
                    radius = 2)
-
 ```
 
-```{r}
+``` r
 knitr::include_graphics("images/pol_dc.jpg")
 ```
 
+![](images/pol_dc.jpg)<!-- -->
 
-```{r}
+``` r
 # fixed and handling costs of the DC
 set.seed(1234)
 
@@ -99,9 +86,7 @@ dc_fix <- round(runif(length(pol_dc$name), 500000, 600000))
 dc_han <- round(runif(length(pol_dc$name), 0.06, 0.08), 2)
 ```
 
-
-
-```{r}
+``` r
 # create a distance matrix between the demand points and DCs
 # this will also act as transportation cost (1PLN/km)
 dist_mat <- geosphere::distm(x = cbind(pol_city$long, pol_city$lat),
@@ -116,11 +101,9 @@ tot_dist_mat <- dist_mat * pol_city$no_of_shipments
 # rownames and colnames
 row.names(dist_mat) = pol_city$name
 colnames(dist_mat) = pol_dc$name
-
 ```
 
-
-```{r}
+``` r
 # create total cost matrix, made of:
 
 # 1. #transportation cost based on batch size and distance
@@ -140,21 +123,20 @@ f_c_mat <- matrix(rep(dc_fix, dim(dist_mat)[1]),
 tot_c_mat <- t_c_mat + h_c_mat + f_c_mat 
 ```
 
-```{r}
+``` r
 # no of customers and DCs
 c_count <- nrow(pol_city)
 d_count <- nrow(pol_dc)
 ```
 
-
-```{r}
+``` r
 n <- length(pol_dc$name)
 
 optimization_overview <- list()
 optimization_results <- list()
 ```
 
-```{r eval = FALSE}
+``` r
 # optimization model
 
 for (i in 1:n) {
@@ -220,15 +202,12 @@ saveRDS(optimization_overview, file = "R_objects/optimization_overview.RDS")
 saveRDS(optimization_results, file = "R_objects/optimization_results.RDS")
 ```
 
-
-
-```{r}
+``` r
 optimization_overview <- readRDS(file = "R_objects/optimization_overview.RDS")
 optimization_results <- readRDS(file = "R_objects/optimization_results.RDS")
 ```
 
-
-```{r}
+``` r
 # data frame and wh cost measure
 overview_summary <- do.call(rbind.data.frame, optimization_overview) %>%
 #  as_tibble() %>%
@@ -237,8 +216,7 @@ overview_summary <- do.call(rbind.data.frame, optimization_overview) %>%
   pivot_longer(!no_of_wh, names_to = 'measure', values_to = "value")
 ```
 
-
-```{r}
+``` r
 #visualization of cost
 p1 <- overview_summary %>%
   filter(measure %in% c('sum_transp_cost', 'sum_wh_cost', 'sum_total_cost')) %>%
@@ -255,7 +233,9 @@ p1 <- overview_summary %>%
 p1
 ```
 
-```{r}
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+
+``` r
 #visualization of total distance
 p2 <- overview_summary %>%
   filter(measure %in% c('sum_total_distance')) %>%
@@ -272,7 +252,9 @@ p2 <- overview_summary %>%
 p2
 ```
 
-```{r}
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+
+``` r
 # max route distance to a customer
 
 p3 <- overview_summary %>%
@@ -289,10 +271,11 @@ p3 <- overview_summary %>%
   theme_light()
 
 p3
-
 ```
 
-```{r eval = FALSE}
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+
+``` r
 # visualization of model with 7 warehouses
 
 leaflet(optimization_results[[7]]) %>%
@@ -310,13 +293,13 @@ leaflet(optimization_results[[7]]) %>%
                    radius = 4)
 ```
 
-
-```{r}
+``` r
 knitr::include_graphics("images/seven_wh.jpg")
 ```
 
+![](images/seven_wh.jpg)<!-- -->
 
-```{r}
+``` r
 #optimization summary
 
 solution_summary <- optimization_results[[7]] %>%
@@ -335,3 +318,12 @@ solution_summary <- optimization_results[[7]] %>%
 knitr::kable(solution_summary)
 ```
 
+| DC_City    | sum_customers | sum_demand | sum_shipments | max_route_distance | sum_total_distance | sum_transp_cost | sum_handling_cost | sum_fixed_cost | sum_total_cost |
+|:-----------|--------------:|-----------:|--------------:|-------------------:|-------------------:|----------------:|------------------:|---------------:|---------------:|
+| Jaworzno   |            91 |   10542834 |         10584 |                121 |             471159 |          471159 |          843426.7 |         562230 |        1876816 |
+| Legnica    |            66 |    5012276 |          5050 |                169 |             337558 |          337558 |          400982.1 |         562338 |        1300878 |
+| Olsztyn    |            57 |    4763972 |          4786 |                177 |             524000 |          524000 |          333478.0 |         564031 |        1421509 |
+| Pila       |            81 |    6787318 |          6829 |                186 |             716510 |          716510 |          407239.1 |         500950 |        1624699 |
+| Siedlce    |            50 |    6219100 |          6246 |                160 |             538389 |          538389 |          435337.0 |         566608 |        1540334 |
+| Tarnobrzeg |            46 |    4581486 |          4601 |                158 |             379305 |          379305 |          320704.0 |         551425 |        1251434 |
+| Zgierz     |            48 |    4942756 |          4963 |                122 |             257461 |          257461 |          296565.4 |         554497 |        1108523 |
