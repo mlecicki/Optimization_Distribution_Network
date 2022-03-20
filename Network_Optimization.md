@@ -7,29 +7,35 @@ Maciej Lecicki
 
 ### Purpose and objectives
 
-Linear optimization is yet another example how Supply Chain can benefit
-open source software like R. In this example we’ll look into supply
-chain network design. The goal is to give decision makers options to
-select location and number of warehouses (DCs) to distribute their
-product (vaccine) on the basis of total cost made of transportation and
-warehouses cost (fixed and variable) or factors like total distance
-(based on customer location and batch size) or maximum distance from
-customer (which can impact delivery time). Linear optimization is done
-using ompr package but since we’ll be working with spatial data, we’ll
-also use maps and leaflet libraries. As always, tidyverse library will
-be helpful to transform and visualize data.
+<br/> **Linear optimization** is yet another example how Supply Chain
+can benefit open source software like R. In this example we’ll look into
+supply chain network design.
 
-List of libraries is available below.
+The **goal** is to give decision makers options to select location and
+number of warehouses (DCs) to distribute their product (vaccine) on the
+basis of: <br/> • total cost made of transportation and warehouses cost
+(fixed and variable) <br/> • other factors like total distance (based on
+customer location and batch size) or maximum distance from customer
+(which can impact delivery time).
+
+Linear optimization is done using ompr package but since we’ll be
+working with spatial data, we’ll also use maps, geosphere and leaflet
+libraries. As always, tidyverse library will be helpful to transform and
+visualize data supported be a few other packages.
+
+**List of all required libraries.**
 
 ``` r
 library(tidyverse)
 library(magrittr)
 library(leaflet)
 library(maps)
+library(geosphere)
 library(ompr)
 library(ompr.roi)
 library(ROI.plugin.glpk)
 library(scales)
+library(measurements)
 library(gridExtra)
 ```
 
@@ -101,12 +107,16 @@ knitr::include_graphics("images/pol_dc.png")
 
 ![](images/pol_dc.png)<!-- -->
 
-### Linear optimization
+### Preparation steps for linear optimization
 
-To be continued…
+<br/> We already have information about geolocation of all cities
+(customers) and their demand and list of twelve potential DCs.
+
+Additional information required as input to optimization: <br/>
+
+1.  fixed WH costs and handling costs (per unit).
 
 ``` r
-# fixed and handling costs of the DC
 set.seed(1234)
 
 dc_fix <- round(runif(length(pol_dc$name), 500000, 600000))
@@ -114,48 +124,115 @@ dc_fix <- round(runif(length(pol_dc$name), 500000, 600000))
 dc_han <- round(runif(length(pol_dc$name), 0.06, 0.08), 2)
 ```
 
+2.  distance matrix (in km) between customers and DCs, which will also
+    act as transportation cost calculated as km \* 1PLN.
+
 ``` r
-# create a distance matrix between the demand points and DCs
-# this will also act as transportation cost (1PLN/km)
 dist_mat <- geosphere::distm(x = cbind(pol_city$long, pol_city$lat),
                              y = cbind(pol_dc$long, pol_dc$lat)) %>%
-  #convert from meters (default) to miles
+  #convert from meters (default) to kilometers
   measurements::conv_unit('m','km') %>%
   round()
-
-# distance matrix adjusted by no of shipments
-tot_dist_mat <- dist_mat * pol_city$no_of_shipments
 
 # rownames and colnames
 row.names(dist_mat) = pol_city$name
 colnames(dist_mat) = pol_dc$name
 ```
 
+3.  total distance matrix which includes number of shipments
+
 ``` r
-# create total cost matrix, made of:
+# distance matrix adjusted by no of shipments
+tot_dist_mat <- dist_mat * pol_city$no_of_shipments
+```
 
-# 1. #transportation cost based on batch size and distance
+4.  cost matrices which serve two key purposes: objective in
+    optimization (next to distance optimization) and ability to
+    summarize cost breakdown for decision making. To simplify
+    calculations on matrices, let’s makes sure they all have same
+    dimensions.<br/>
+
+<!-- -->
+
+1.  transportation cost matrix (based on distance and number of
+    shipments)
+
+``` r
 t_c_mat <- tot_dist_mat
+```
 
-# 2. handling cost matrix
+2.  handling cost matrix
+
+``` r
 h_c_mat <- matrix(rep(dc_han, dim(dist_mat)[1]),
                   ncol = dim(dist_mat)[2], 
                   byrow = TRUE) * pol_city$demand
+```
 
-# 3. fixed cost
+3.  fixed cost matrix
+
+``` r
 f_c_mat <- matrix(rep(dc_fix, dim(dist_mat)[1]),
                   ncol = dim(dist_mat)[2], 
                   byrow = TRUE)
+```
 
-# total cost
+4.  total cost matrix
+
+``` r
 tot_c_mat <- t_c_mat + h_c_mat + f_c_mat 
 ```
 
+5.  matrices iterators which reflect number of cities and DCs (dimension
+    of matrices)
+
 ``` r
-# no of customers and DCs
 c_count <- nrow(pol_city)
 d_count <- nrow(pol_dc)
 ```
+
+### Linear optimization
+
+<br/>
+
+Linear optimization is performed using ompr library. We first need to
+specify optimization variables, constraints and objective.
+
+**Variables:** <br/> • x is binary decision variable. It’s
+interpretation is: for each customer, which DC to align to? <br/> • y is
+binary decision variable: open DC or no?
+
+**Constraints:** <br/> • each customer aligned to 1 and only 1 DC <br/>
+• assigned DC must be opened <br/> • set fixed number of opened DCs
+<br/>
+
+We could add additional constraints, like maximum distance to customer,
+maximum total distance to distribute all products or constraint like
+minimum number of customers per DC. The only watch-out to highlight is
+that the more constraints we add, the longer optimization can take and
+the bigger chance that no optimal solution can be found. It make take
+some trial and error to configure list and values for all constraints
+and it is good opportunity to build Shiny web application.
+
+Our **objective** is to minimize total distance (which includes number
+of shipments) between customers and DCs (alternative objective could be
+to minimize cost).
+
+Linear optimization problem will be solved using ‘glpk’ engine.
+
+### Linear optimization based on number of DCs
+
+<br/>
+
+The question that we would like to answer is **‘what is the optimal
+number of DCs in our distribution network?’**. We will consider cost and
+distance related factors. We aim to minimize total distance between
+customers and DC(s) but to answer this question we need to prepare
+summary for each option (one DC to twelve DCs).
+
+We’ll perform this check in a loop, iterating by number of DCs. Let’s
+prepare iterators and containers to capture results which will be
+further summarized.
 
 ``` r
 n <- length(pol_dc$name)
@@ -164,9 +241,10 @@ optimization_overview <- list()
 optimization_results <- list()
 ```
 
-``` r
-# optimization model
+It takes a few minutes to execute below code so it also good to save
+results afterwards…
 
+``` r
 for (i in 1:n) {
 
   wh_model <- ompr::MIPModel() %>%
@@ -230,22 +308,34 @@ saveRDS(optimization_overview, file = "R_objects/optimization_overview.RDS")
 saveRDS(optimization_results, file = "R_objects/optimization_results.RDS")
 ```
 
+… which can be read into our environment.
+
 ``` r
 optimization_overview <- readRDS(file = "R_objects/optimization_overview.RDS")
 optimization_results <- readRDS(file = "R_objects/optimization_results.RDS")
 ```
 
+Our containers are lists, let’s change the format to tibble in order to
+use potential of tidyverse packages. This will be required to calculate
+sum of wh cost or sum of total costs or to change tibble format from
+wide to long which supports visualizations in ggplot2.
+
 ``` r
-# data frame and wh cost measure
 overview_summary <- do.call(rbind.data.frame, optimization_overview) %>%
-#  as_tibble() %>%
   mutate(sum_wh_cost = sum_handling_cost + sum_fixed_cost,
          sum_total_cost = sum_wh_cost + sum_transp_cost) %>%
   pivot_longer(!no_of_wh, names_to = 'measure', values_to = "value")
 ```
 
+### Linear optimization results
+
+<br/>
+
+Let’s look into cost overview. We’re interested in sum of transportation
+costs, sum of warehousing cost (made of handling and fixed costs) and
+total cost.
+
 ``` r
-#visualization of cost
 p1 <- overview_summary %>%
   filter(measure %in% c('sum_transp_cost', 'sum_wh_cost', 'sum_total_cost')) %>%
   ggplot(aes(x = no_of_wh, y = value, color = measure)) +
@@ -257,11 +347,14 @@ p1 <- overview_summary %>%
   labs(title = "Cost summary based on warehousing and transportation costs.",
        x = "Number of warehouses",
        y = "Cost (PLN)")
-
 p1
 ```
 
-![](Network_Optimization_files/figure-gfm/unnamed-chunk-16-1.png)<!-- -->
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-20-1.png)<!-- -->
+
+We can do the same to understand logistical implications from selection
+of given number of DCs. Let’s look into total distance that will be
+covered to distribute all vaccines…
 
 ``` r
 #visualization of total distance
@@ -276,15 +369,15 @@ p2 <- overview_summary %>%
   labs(title = "Total distance based on number of warehouses.",
        x = "Number of warehouses",
        y = "Total distance (km)")
-
 p2
 ```
 
-![](Network_Optimization_files/figure-gfm/unnamed-chunk-17-1.png)<!-- -->
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-21-1.png)<!-- -->
+
+… and longest route from DC to farthest customer (which has direct
+impact on lead time and customer satisfaction).
 
 ``` r
-# max route distance to a customer
-
 p3 <- overview_summary %>%
   filter(measure %in% c('max_route_distance')) %>%
   ggplot(aes(x = no_of_wh, y = value)) +
@@ -297,15 +390,27 @@ p3 <- overview_summary %>%
        x = "Number of warehouses",
        y = "Distance (km)") +
   theme_light()
-
 p3
 ```
 
-![](Network_Optimization_files/figure-gfm/unnamed-chunk-18-1.png)<!-- -->
+![](Network_Optimization_files/figure-gfm/unnamed-chunk-22-1.png)<!-- -->
+
+Visualization of costs and distance help make a decision regarding
+number of DCs that we would like to include in our network. Typically
+there is a trade-off between cost and service and this is exactly why
+options should be given to decision makers.
+
+Based on cost and distance overview we will select seven DCs. Let’s see
+which ones support our objective to minimize total distance. Below code
+generates interactive html map. We can see location on each DC and
+colour-coded cities which belong to each DC. We can also hover over DC
+to get it’s name. Leaflet also allows more fancy visualizations but
+let’s keep it simple.
+
+All details of our network with seven DCs are kept in
+‘optimization_results’ list and can be easily subset for visualization.
 
 ``` r
-# visualization of model with 7 warehouses
-
 leaflet(optimization_results[[7]]) %>%
   addTiles() %>%
   addCircleMarkers(lat = ~Customer_Lat,
@@ -321,15 +426,20 @@ leaflet(optimization_results[[7]]) %>%
                    radius = 4)
 ```
 
+Since html cannot be displayed on github due to size limitations below
+is static representation of above code.
+
 ``` r
 knitr::include_graphics("images/seven_wh.png")
 ```
 
 ![](images/seven_wh.png)<!-- -->
 
-``` r
-#optimization summary
+We can also prepare tabular summary of our solution grouped by DC. It
+gives all necessary information like number of customers, demand and
+distance overview or costs summary.
 
+``` r
 solution_summary <- optimization_results[[7]] %>%
   group_by(DC_City) %>%
   summarize(sum_customers = n(),
@@ -355,3 +465,16 @@ knitr::kable(solution_summary)
 | Siedlce    |            50 |    6219100 |          6246 |                160 |             538389 |          538389 |          435337.0 |         566608 |        1540334 |
 | Tarnobrzeg |            46 |    4581486 |          4601 |                158 |             379305 |          379305 |          320704.0 |         551425 |        1251434 |
 | Zgierz     |            48 |    4942756 |          4963 |                122 |             257461 |          257461 |          296565.4 |         554497 |        1108523 |
+
+### Summary
+
+<br/>
+
+**Open source software like R provide with all necessary tools to
+perform linear optimization which can help supply chain professionals**.
+Above example supports network design and helps decision makers select
+optimal number and location of DCs taking into account cost, logistical
+and service related factors. <br/> If such activity is performed more
+frequently and require more constraints good idea could be Shiny web
+application with user friendly interface. Example of such app can be
+soon found in my repository.
